@@ -2,7 +2,7 @@
 
 dir_data=$1
 
-if [ -z "$dir_mi_seq" ]; 
+if [ -z "$dir_data" ]; 
 then
 echo -e "\n#======================================================================================================#\n"
 echo "./Circular_JGER_0 /home/jgemr/path/to/the/file/containing/the/contigs/where/you/want/to/do/the/analysis"
