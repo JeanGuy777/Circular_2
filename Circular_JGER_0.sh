@@ -1,6 +1,14 @@
 #!/bin/bash
 
-dir_data=/home/jean-guillaume/Bureau/Travaux/Salmonella/Plasmidome
+dir_data=$1
+
+if [ -z "$dir_mi_seq" ]; 
+then
+echo -e "#======================================================================================================#\n"
+echo "./Circular_JGER_0 /home/jgemr/path/to/the/contigs/repertory/where/you/want/to/do/the/analysis"
+echo -e "#======================================================================================================#\n"
+exit 1;
+fi
 
 rm $dir_data/summary.txt
 
