@@ -1,0 +1,97 @@
+#!/bin/bash
+
+dir_data=$1
+
+if [ -z "$dir_data" ]; 
+then
+echo -e "\n#======================================================================================================#\n"
+echo "./Circular_JGER_0 /home/jgemr/path/to/the/file/containing/the_putative-plasmid_scaffolds"
+echo -e "\n#======================================================================================================#\n"
+exit 1;
+fi
+
+dir_water=$(which water)
+
+if [ -z "$dir_water" ]; 
+then
+echo -e "\n#======================================================================================================#\n"
+echo "You need to install EMBOSS water, there is the link http://www.ebi.ac.uk/Tools/psa/emboss_water/"
+echo -e "\n#======================================================================================================#\n"
+exit 1;
+else
+echo "I've found the software water there: "$dir_water""
+fi
+
+dir_samtools=$(which samtools)
+
+if [ -z "$dir_samtools" ]; 
+then
+echo -e "\n#======================================================================================================#\n"
+echo "You need to install samtools"
+echo -e "\n#======================================================================================================#\n"
+exit 1;
+else
+echo "I've found the software samtools there: "$dir_samtools""
+fi
+
+dir_out=$(echo $dir_data | sed 's/\(.*\)\//\1\/ /' | awk '{print $1}')
+file_name=$(echo $dir_data | sed 's/\(.*\)\//\1 /' | awk '{print $2}')
+rm $dir_out/summary.txt
+
+#======================================================================================#
+##Circular analysis etape 0
+#======================================================================================#
+echo -e "###   Circular analysis $(date)   ###\n" | tee -a "$dir_out/summary.txt"
+
+
+rm -R $dir_out/Circular2.0/;
+mkdir -p $dir_out/Circular2.0/fasta;
+mkdir $dir_out/Circular2.0/raw_data/
+
+
+grep '>' $dir_data | sed 's/>//' > $dir_out/Circular2.0/list_scaffolds.txt;
+
+echo -e "##   Putative plasmid sequences extraction from the file $file_name $(date)   ##\n" | tee -a "$dir_out/summary.txt"
+cat $dir_out/Circular2.0/list_scaffolds.txt | while read plasmid;
+do
+samtools faidx $dir_data $plasmid > $dir_out/Circular2.0/fasta/$plasmid.fasta;
+done;
+
+
+echo -e "##   Water local alignment in process $(date)   ##\n" | tee -a "$dir_out/summary.txt"
+cat $dir_out/Circular2.0/list_scaffolds.txt | while read plasmid;
+do
+number1=$(seq_length.py $dir_out/Circular2.0/fasta/$plasmid.fasta | awk '{print $2}'); 
+number2=$(expr $number1 - 200) ; 
+water -asequence $dir_out/Circular2.0/fasta/$plasmid.fasta -bsequence $dir_out/Circular2.0/fasta/$plasmid.fasta $plasmid.circular.out -adirectory3 $dir_out/Circular2.0/raw_data/ -sbegin1 1 -send1 200 -sbegin2 $number2 -send2 $number1 -gapopen 10 -gapextend 5 &>> $dir_out/summary.txt; 
+done;
+
+
+echo -e "##   Results table creation $(date)   ##\n" | tee -a "$dir_out/summary.txt"
+cat $dir_out/Circular2.0/list_scaffolds.txt | while read plasmid; 
+do
+length1=$(grep 'Length' $dir_out/Circular2.0/raw_data/$plasmid.circular.out | sed 's/# Length: //');
+identity=$(grep 'Identity' $dir_out/Circular2.0/raw_data/$plasmid.circular.out | sed 's/# Identity://' | sed 's/ //g');
+similarity=$(grep 'Similarity' $dir_out/Circular2.0/raw_data/$plasmid.circular.out | sed 's/# Similarity://' | sed 's/ //g');
+gaps=$(grep 'Gaps' $dir_out/Circular2.0/raw_data/$plasmid.circular.out | sed 's/# Gaps://' | sed 's/ //g');
+scores=$(grep 'Score' $dir_out/Circular2.0/raw_data/$plasmid.circular.out | sed 's/# Score: //');
+echo $plasmid | awk -vlength1="$length1" -videntity="$identity" -vsimilarity="$similarity" -vgaps="$gaps" -vscores="$scores"  '{print $1 "\t" length1 "\t" identity "\t" similarity "\t" gaps "\t" scores}' 
+done | sort -Vk6,6 | sed '1icontig_name\tlength_alignment\tidentity_alignment\tsimilarity_alignment\tgaps_alignment\tscores_alignment' > $dir_out/Circular2.0/all_scaffolds.circular.txt
+
+
+echo -e "##   Find scaffold with an alignment scores more than 500 and an alignment identity more than 98% $(date)   ##\n" | tee -a "$dir_out/summary.txt"
+tail -n +2 $dir_out/Circular2.0/all_scaffolds.circular.txt | while read line; 
+do 
+identity=$(echo $line | awk '{print $3}' | sed 's/%)//' | sed 's/(/ /' | awk '{print $2}'); 
+echo $line | awk -videntity="$identity" '{if($6>=500&&identity>=98) print $0}'; 
+done | sed '1icontig_name\tlength_alignment\tidentity_alignment\tsimilarity_alignment\tgaps_alignment\tscores_alignment' > $dir_out/Circular2.0/scaffolds.real_circular.txt
+
+
+
+echo "***Circular analysis DONE!! $(date)***" | tee -a "$dir_out/summary.txt"
+#======================================================================================#
+echo -e "#===================================================================================#\n" | tee -a "$dir_out/summary.txt"
+
+echo -e "Have done M. Emond-R\n"
+
+echo "Have a good day"
